@@ -1,0 +1,31 @@
+{
+    "name": "smart-response",
+    "version": "1.0.0",
+    "description": "Smart response service for ActivityWatch data",
+    "main": "dist/index.js",
+    "scripts": {
+        "start": "node dist/index.js",
+        "dev": "ts-node src/index.ts",
+        "build": "tsc",
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "keywords": [
+        "activitywatch",
+        "filtering",
+        "buffer",
+        "workpal"
+    ],
+    "author": "Hrishabh Ayush",
+    "license": "ISC",
+    "dependencies": {
+        "axios": "^1.10.0",
+        "dotenv": "^17.0.0",
+        "express": "^5.1.0",
+        "openai": "^5.8.2"
+    },
+    "devDependencies": {
+        "@types/express": "^5.0.3",
+        "@types/node": "^24.0.7",
+        "ts-node": "^10.9.2"
+    }
+}
