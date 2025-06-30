@@ -13,9 +13,9 @@ let lastEventTimestamp: string = new Date(Date.now() - 30000).toISOString(); // 
 
 function startBufferService() {
     // Initialize express server on BUFFER_PORT    
-    const port = process.env.BUFFER_PORT;
-    const activityWatchUrl = process.env.ACTIVITYWATCH_API_URL || "";
-    const webhookTargetUrl = process.env.WEBHOOK_TARGET_URL || "";
+    const port = process.env.BUFFER_PORT || 3000;
+    const activityWatchUrl = process.env.ACTIVITYWATCH_API_URL || "http://localhost:5600/api";
+    const webhookTargetUrl = process.env.WEBHOOK_TARGET_URL || "http://localhost:4000";
     
     // Initialize current state tracking
     let currentState = {
@@ -27,8 +27,8 @@ function startBufferService() {
     };
     
     let eventBuffer: any[] = [];
-    const bufferTimeWindow = 10000; // 10 seconds
-    const pollingInterval = 5000; // Poll every 5 seconds
+    const bufferTimeWindow = 10000; // 10 seconds (still used for manual events)
+    const pollingInterval = 2000; // Poll every 2 seconds for immediate response
     
     // Setup ActivityWatch API connection test
     axios.get(`${activityWatchUrl}/0/info`)
@@ -79,14 +79,14 @@ async function startActivityWatchPolling(activityWatchUrl: string, eventBuffer: 
     
     setInterval(async () => {
         try {
-            await pollActivityWatchData(activityWatchUrl, eventBuffer, currentState);
+            await pollActivityWatchData(activityWatchUrl, eventBuffer, currentState, webhookTargetUrl);
         } catch (error) {
             console.error('❌ Polling error:', error);
         }
-    }, 5000); // Poll every 5 seconds
+    }, 2000); // Poll every 2 seconds
 }
 
-async function pollActivityWatchData(activityWatchUrl: string, eventBuffer: any[], currentState: any) {
+async function pollActivityWatchData(activityWatchUrl: string, eventBuffer: any[], currentState: any, webhookTargetUrl: string) {
     try {
         // Get available buckets
         const bucketsResponse = await axios.get(`${activityWatchUrl}/0/buckets/`);
@@ -108,6 +108,7 @@ async function pollActivityWatchData(activityWatchUrl: string, eventBuffer: any[
                 
                 // Process each event
                 for (const event of events) {
+                    console.log(`📋 Raw event:`, JSON.stringify(event, null, 2));
                     const processedEvent = {
                         bucketId,
                         timestamp: event.timestamp,
@@ -120,7 +121,10 @@ async function pollActivityWatchData(activityWatchUrl: string, eventBuffer: any[
                         idleStatus: event.data?.status === 'afk'
                     };
                     
-                    receiveActivityEvent(processedEvent, eventBuffer, currentState, '');
+                    // Forward every event immediately (no buffering)
+                    console.log(`🚀 Immediately forwarding: ${processedEvent.appName} - ${processedEvent.eventType}`);
+                    maintainCurrentState(processedEvent, currentState);
+                    forwardToWebhook(processedEvent, currentState, webhookTargetUrl);
                 }
                 
                 // Update last timestamp
@@ -173,7 +177,19 @@ function forwardToWebhook(event: any, currentState: any, webhookTargetUrl: strin
         eventType: 'activity_change'
     };
     
-    axios.post(webhookTargetUrl, filteredEvent)
+    // Generate signature for webhook verification
+    const crypto = require('crypto');
+    const webhookSecret = process.env.WEBHOOK_SECRET || '';
+    const hmac = crypto.createHmac('sha256', webhookSecret);
+    hmac.update(JSON.stringify(filteredEvent));
+    const signature = hmac.digest('base64');
+    
+    axios.post(webhookTargetUrl, filteredEvent, {
+        headers: {
+            'x-signature': signature,
+            'Content-Type': 'application/json'
+        }
+    })
         .then(response => {
             console.log('✅ Event forwarded to webhook successfully');
         })
