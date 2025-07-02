@@ -1,11 +1,14 @@
 import { ProcessedActivity, SmartResponse } from '../types';
 export declare class ResponseGenerator {
     private openaiService;
+    private agentsService;
     constructor();
-    generateResponse(processedActivity: ProcessedActivity): Promise<SmartResponse>;
-    private enhanceRecommendations;
-    private generateProductivityTips;
+    generateResponse(processedActivity: ProcessedActivity, agentId?: string): Promise<SmartResponse>;
+    private enhanceRecommendationsWithPersonality;
+    private generatePersonalityTips;
+    private getOverworkTipByAgent;
     private calculateFocusScore;
-    private generateDetailedSummary;
+    private generatePersonalizedSummary;
+    getAvailableAgents(): import("../types").DoodleAgent[];
 }
 //# sourceMappingURL=responseGenerator.d.ts.map

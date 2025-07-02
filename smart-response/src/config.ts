@@ -1,4 +1,7 @@
+import { configDotenv } from 'dotenv';
 import { Config } from './types';
+
+configDotenv();
 
 export const config: Config = {
   port: parseInt(process.env.PORT || '3003'),
@@ -9,6 +12,9 @@ export const config: Config = {
   },
   logging: {
     level: process.env.LOG_LEVEL || 'info',
+  },
+  agents: {
+    apiUrl: process.env.AGENTS_API_URL || 'https://agents-api.doodles.app',
   },
 };
 

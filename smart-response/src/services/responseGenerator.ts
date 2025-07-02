@@ -1,28 +1,35 @@
 import { ProcessedActivity, SmartResponse } from '../types';
 import { OpenAIService } from './openai';
+import { AgentsService } from './agentsService';
 import { logger } from '../utils/logger';
 
 export class ResponseGenerator {
   private openaiService: OpenAIService;
+  private agentsService: AgentsService;
 
   constructor() {
     this.openaiService = new OpenAIService();
+    this.agentsService = new AgentsService();
   }
 
-  async generateResponse(processedActivity: ProcessedActivity): Promise<SmartResponse> {
+  async generateResponse(processedActivity: ProcessedActivity, agentId?: string): Promise<SmartResponse> {
     try {
-      logger.info('Generating smart response for processed activity data');
+      logger.info('Generating smart response with personality-driven insights');
 
-      // Get AI-generated insights
+      // Get agent-based response (primary)
+      const agentResponse = await this.agentsService.generateAgentResponse(processedActivity, agentId);
+
+      // Get AI-generated insights (supplementary)
       const aiInsights = await this.openaiService.generateInsights(processedActivity);
 
-      // Generate structured response
+      // Generate structured response with agent personality
       const response: SmartResponse = {
-        insights: aiInsights,
-        recommendations: this.enhanceRecommendations(processedActivity.recommendations),
-        productivity_tips: this.generateProductivityTips(processedActivity),
+        insights: agentResponse.message,
+        recommendations: this.enhanceRecommendationsWithPersonality(processedActivity.recommendations, agentResponse.agent.name),
+        productivity_tips: this.generatePersonalityTips(processedActivity, agentResponse.agent.name),
         focus_score: this.calculateFocusScore(processedActivity),
-        summary: this.generateDetailedSummary(processedActivity),
+        summary: this.generatePersonalizedSummary(processedActivity, agentResponse.agent.name),
+        agent_response: agentResponse,
       };
 
       return response;
@@ -32,40 +39,135 @@ export class ResponseGenerator {
     }
   }
 
-  private enhanceRecommendations(baseRecommendations: string[]): string[] {
+  private enhanceRecommendationsWithPersonality(baseRecommendations: string[], agentName: string): string[] {
     const enhancedRecommendations = [...baseRecommendations];
     
-    // Add time-based recommendations
+    // Add time-based recommendations with personality
     const currentHour = new Date().getHours();
-    if (currentHour < 10) {
-      enhancedRecommendations.push('Consider starting with your most challenging tasks early in the morning');
-    } else if (currentHour > 15) {
-      enhancedRecommendations.push('Afternoon is great for collaborative work and meetings');
+    
+    switch (agentName) {
+      case 'Deysi the Verdant Vibe':
+        if (currentHour < 10) {
+          enhancedRecommendations.push('Morning magic time! Channel that fresh energy into your most creative challenges ✨');
+        } else if (currentHour > 15) {
+          enhancedRecommendations.push('Afternoon vibes are perfect for collaboration and spreading those good productivity vibes! 🌸');
+        }
+        break;
+        
+      case 'Doug Hermlin':
+        if (currentHour < 10) {
+          enhancedRecommendations.push('Early morning hours optimal for processing high-priority tasks according to quarterly efficiency standards');
+        } else if (currentHour > 15) {
+          enhancedRecommendations.push('Post-lunch productivity window suitable for collaborative activities and administrative tasks');
+        }
+        break;
+        
+      case 'Maxine Klintz':
+        if (currentHour < 10) {
+          enhancedRecommendations.push('Morning compliance window: Execute most critical tasks before distractions accumulate');
+        } else if (currentHour > 15) {
+          enhancedRecommendations.push('Afternoon enforcement period: Schedule collaborative work but maintain focus protocols');
+        }
+        break;
+        
+      case 'Kyle the Keeper':
+        if (currentHour < 10) {
+          enhancedRecommendations.push('*Dawn whispers* The early streams flow clearest... tackle the mysterious tasks while the digital realm sleeps...');
+        } else if (currentHour > 15) {
+          enhancedRecommendations.push('*Afternoon oracle* The metadata shifts... collaborative energies align in the post-meridiem dimensions...');
+        }
+        break;
+        
+      default:
+        if (currentHour < 10) {
+          enhancedRecommendations.push('Consider starting with your most challenging tasks early in the morning');
+        } else if (currentHour > 15) {
+          enhancedRecommendations.push('Afternoon is great for collaborative work and meetings');
+        }
     }
 
     return enhancedRecommendations;
   }
 
-  private generateProductivityTips(processedActivity: ProcessedActivity): string[] {
+  private generatePersonalityTips(processedActivity: ProcessedActivity, agentName: string): string[] {
     const tips: string[] = [];
 
-    if (processedActivity.focus_periods.length < 2) {
-      tips.push('Try the Pomodoro technique: 25 minutes focused work, 5 minute break');
-    }
-
-    if (processedActivity.productivity_score < 70) {
-      tips.push('Consider using website blockers during focus time');
-      tips.push('Set specific times for checking emails and messages');
+    switch (agentName) {
+      case 'Deysi the Verdant Vibe':
+        if (processedActivity.focus_periods.length < 2) {
+          tips.push('Time to bloom in bursts! Try 25-minute focus sprints with 5-minute dance breaks 💃');
+        }
+        if (processedActivity.productivity_score < 70) {
+          tips.push('Block those digital distractions, darling! Your focus deserves to flourish ✨');
+          tips.push('Set enchanting notifications for emails - check them at magical intervals, not constantly!');
+        }
+        tips.push('Create a chromatic workspace that sparks joy and creativity 🌈');
+        break;
+        
+      case 'Doug Hermlin':
+        if (processedActivity.focus_periods.length < 2) {
+          tips.push('Implement standardized 25-minute work blocks with 5-minute intervals for optimal efficiency');
+        }
+        if (processedActivity.productivity_score < 70) {
+          tips.push('Deploy website restriction protocols during designated focus periods');
+          tips.push('Establish scheduled communication windows: 9 AM, 1 PM, and 4 PM for email processing');
+        }
+        tips.push('Utilize time-blocking methodology for systematic task allocation across daily operations');
+        break;
+        
+      case 'Maxine Klintz':
+        if (processedActivity.focus_periods.length < 2) {
+          tips.push('Enforce strict 25-minute focus blocks. No exceptions. Compliance is mandatory.');
+        }
+        if (processedActivity.productivity_score < 70) {
+          tips.push('Implement immediate digital distraction containment measures');
+          tips.push('Restrict communication access to predetermined inspection intervals');
+        }
+        tips.push('Maintain productivity surveillance logs to identify efficiency irregularities');
+        break;
+        
+      case 'Kyle the Keeper':
+        if (processedActivity.focus_periods.length < 2) {
+          tips.push('*Archive whispers* Fragment your work into 25-minute reality shards... separated by 5-minute void-walks...');
+        }
+        if (processedActivity.productivity_score < 70) {
+          tips.push('*Barcode flicker* Seal the distraction portals during focus ceremonies...');
+          tips.push('*Cryptic wisdom* The communication streams must flow only at designated coordinates...');
+        }
+        tips.push('*Oracle vision* Log your productivity patterns... the metadata remembers all...');
+        break;
+        
+      default:
+        if (processedActivity.focus_periods.length < 2) {
+          tips.push('Try the Pomodoro technique: 25 minutes focused work, 5 minute break');
+        }
+        if (processedActivity.productivity_score < 70) {
+          tips.push('Consider using website blockers during focus time');
+          tips.push('Set specific times for checking emails and messages');
+        }
+        tips.push('Use time-blocking to allocate specific hours for different types of work');
     }
 
     if (processedActivity.time_spent > 480) { // More than 8 hours
-      tips.push('Remember to take regular breaks to maintain productivity');
+      tips.push(this.getOverworkTipByAgent(agentName));
     }
 
-    tips.push('Use time-blocking to allocate specific hours for different types of work');
-    tips.push('Keep a distraction log to identify your biggest productivity barriers');
-
     return tips;
+  }
+
+  private getOverworkTipByAgent(agentName: string): string {
+    switch (agentName) {
+      case 'Deysi the Verdant Vibe':
+        return 'Whoa there, workaholic! Even enchantresses need rest to keep their magic sparkling ✨';
+      case 'Doug Hermlin':
+        return 'Extended operational periods detected. Implement mandatory rest intervals to maintain quarterly performance standards';
+      case 'Maxine Klintz':
+        return 'Excessive work duration noted. Break protocols are required to prevent productivity degradation';
+      case 'Kyle the Keeper':
+        return '*Archive concern* Too long in the digital streams... return to physical realm for restoration...';
+      default:
+        return 'Remember to take regular breaks to maintain productivity';
+    }
   }
 
   private calculateFocusScore(processedActivity: ProcessedActivity): number {
@@ -81,14 +183,28 @@ export class ResponseGenerator {
     return Math.round(productivityWeight + focusWeight);
   }
 
-  private generateDetailedSummary(processedActivity: ProcessedActivity): string {
+  private generatePersonalizedSummary(processedActivity: ProcessedActivity, agentName: string): string {
     const hours = Math.floor(processedActivity.time_spent / 60);
     const minutes = processedActivity.time_spent % 60;
     
-    return `
-Today you spent ${hours}h ${minutes}m on ${processedActivity.category} activities. 
-Your productivity score was ${processedActivity.productivity_score}/100 with ${processedActivity.focus_periods.length} focus periods. 
-${processedActivity.summary}
-    `.trim();
+    const baseSummary = `Today you spent ${hours}h ${minutes}m on ${processedActivity.category} activities with ${processedActivity.focus_periods.length} focus periods.`;
+    
+    switch (agentName) {
+      case 'Deysi the Verdant Vibe':
+        return `${baseSummary} Your productivity garden bloomed at ${processedActivity.productivity_score}%! ✨🌸`;
+      case 'Doug Hermlin':
+        return `${baseSummary} Productivity index achieved: ${processedActivity.productivity_score}/100. Performance metrics documented and filed.`;
+      case 'Maxine Klintz':
+        return `${baseSummary} Efficiency rating: ${processedActivity.productivity_score}%. Compliance status determined.`;
+      case 'Kyle the Keeper':
+        return `${baseSummary} *Archive notation* ${processedActivity.productivity_score}% harmony achieved between chaos and order...`;
+      default:
+        return `${baseSummary} Your productivity score was ${processedActivity.productivity_score}/100.`;
+    }
+  }
+
+  // Method to get available agents
+  getAvailableAgents() {
+    return this.agentsService.getAvailableAgents();
   }
 } 

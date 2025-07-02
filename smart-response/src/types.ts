@@ -24,12 +24,27 @@ export interface FocusPeriod {
   quality: 'high' | 'medium' | 'low';
 }
 
+export interface DoodleAgent {
+  id: string;
+  name: string;
+  avatar: string;
+  bio: string;
+}
+
+export interface AgentResponse {
+  agent: DoodleAgent;
+  message: string;
+  personality_insights: string[];
+  tone: 'encouraging' | 'playful' | 'strict' | 'cryptic' | 'chaotic';
+}
+
 export interface SmartResponse {
   insights: string;
   recommendations: string[];
   productivity_tips: string[];
   focus_score: number;
   summary: string;
+  agent_response?: AgentResponse;
 }
 
 export interface APIResponse<T> {
@@ -48,5 +63,8 @@ export interface Config {
   };
   logging: {
     level: string;
+  };
+  agents: {
+    apiUrl: string;
   };
 } 
