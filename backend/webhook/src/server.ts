@@ -4,17 +4,22 @@ import dotenv from 'dotenv';
 import { ActivityProcessor } from '../../../smart-response/src/services/activityProcessor';
 import { ResponseGenerator } from '../../../smart-response/src/services/responseGenerator';
 import { validateActivityData } from '../../../smart-response/src/utils/validation';
+import cors from 'cors';
 
 dotenv.config();
 
 const app = express();
 app.use(express.json({ limit: '1mb' }));
+app.use(cors());
 
 const PORT = process.env.PORT || process.env.SERVER_PORT || 4000;
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || '';
 
 const activityProcessor = new ActivityProcessor();
 const responseGenerator = new ResponseGenerator();
+
+// In-memory storage of last agent reply
+let lastReply: { text: string; timestamp: string } | null = null;
 
 app.get('/health', (_: Request, res: Response) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -38,14 +43,22 @@ app.post('/', async (req: Request, res: Response) => {
     const processed = await activityProcessor.process(validated);
     const smart = await responseGenerator.generateResponse(processed, agentId);
 
-    return res.json({
-      text: smart.agent_response?.message || smart.insights,
-      saveModified: false,
-    });
+    const replyText = smart.agent_response?.message || smart.insights;
+
+    // Store for overlay polling
+    lastReply = { text: replyText, timestamp: new Date().toISOString() };
+
+    return res.json({ text: replyText, saveModified: false });
   } catch (err) {
     console.error('Processing error', err);
     return res.status(500).json({ error: 'Processing error' });
   }
+});
+
+// Endpoint for overlay to fetch the most recent agent message
+app.get('/latest', (_req: Request, res: Response) => {
+  if (!lastReply) return res.status(204).send();
+  res.json(lastReply);
 });
 
 app.listen(PORT, () => {
