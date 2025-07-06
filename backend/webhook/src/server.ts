@@ -1,9 +1,7 @@
 import express, { Request, Response } from 'express';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
-import { ActivityProcessor } from '../../../smart-response/src/services/activityProcessor';
-import { ResponseGenerator } from '../../../smart-response/src/services/responseGenerator';
-import { validateActivityData } from '../../../smart-response/src/utils/validation';
+import axios from 'axios';
 import cors from 'cors';
 
 dotenv.config();
@@ -15,11 +13,18 @@ app.use(cors());
 const PORT = process.env.PORT || process.env.SERVER_PORT || 4000;
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || '';
 
-const activityProcessor = new ActivityProcessor();
-const responseGenerator = new ResponseGenerator();
+// In-memory storage of replies
+interface ChatEntry {
+  text: string;
+  agent: string;
+  avatar?: string;
+  voiceId?: string;
+  summary: string;
+  timestamp: string;
+}
 
-// In-memory storage of last agent reply
-let lastReply: { text: string; timestamp: string } | null = null;
+let lastReply: ChatEntry | null = null;
+const history: ChatEntry[] = [];
 
 app.get('/health', (_: Request, res: Response) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -39,14 +44,38 @@ app.post('/', async (req: Request, res: Response) => {
       return res.json({ text: 'No activity data', saveModified: false });
     }
 
-    const validated = validateActivityData(activityData);
-    const processed = await activityProcessor.process(validated);
-    const smart = await responseGenerator.generateResponse(processed, agentId);
+    // ---- Simple forward: send activities to DreamNet agent endpoint ----
+    let replyText = 'No reply';
+    let agentName = 'Agent';
+    let avatar: string | undefined = undefined;
+    let voiceId: string | undefined = undefined;
 
-    const replyText = smart.agent_response?.message || smart.insights;
+    try {
+      const dreamRes = await axios.post(
+        `https://hackathon.dreamnet.io/agent/${agentId}/chat`,
+        { text: JSON.stringify(activityData) }
+      );
+      replyText = dreamRes.data?.text ?? JSON.stringify(dreamRes.data);
+      agentName = dreamRes.data?.agent?.name || 'Agent';
+      avatar = dreamRes.data?.agent?.avatar;
+      voiceId = dreamRes.data?.agent?.voiceId;
+    } catch (err) {
+      console.error('DreamNet agent request failed', err);
+      return res.status(502).json({ error: 'Failed to contact DreamNet agent' });
+    }
 
-    // Store for overlay polling
-    lastReply = { text: replyText, timestamp: new Date().toISOString() };
+    const entry: ChatEntry = {
+      text: replyText,
+      agent: agentName,
+      avatar,
+      voiceId,
+      summary: '',
+      timestamp: new Date().toISOString(),
+    };
+
+    // Store for overlay polling and history
+    lastReply = entry;
+    history.push(entry);
 
     return res.json({ text: replyText, saveModified: false });
   } catch (err) {
@@ -59,6 +88,11 @@ app.post('/', async (req: Request, res: Response) => {
 app.get('/latest', (_req: Request, res: Response) => {
   if (!lastReply) return res.status(204).send();
   res.json(lastReply);
+});
+
+// Full chat history (limited to last 100 messages)
+app.get('/history', (_req: Request, res: Response) => {
+  res.json(history.slice(-100));
 });
 
 app.listen(PORT, () => {

@@ -27,7 +27,7 @@ function startBufferService() {
     };
     
     let eventBuffer: any[] = [];
-    const bufferTimeWindow = 10000; // 10 seconds (still used for manual events)
+    const bufferTimeWindow = 30000; // 30-second aggregation window
     const pollingInterval = 2000; // Poll every 2 seconds for immediate response
     
     // Setup ActivityWatch API connection test
@@ -69,7 +69,6 @@ function startBufferService() {
     setInterval(() => {
         if (eventBuffer.length > 0) {
             processEventWindow(eventBuffer, currentState, webhookTargetUrl);
-            eventBuffer = []; // Clear buffer after processing
         }
     }, bufferTimeWindow);
 }
@@ -121,10 +120,11 @@ async function pollActivityWatchData(activityWatchUrl: string, eventBuffer: any[
                         idleStatus: event.data?.status === 'afk'
                     };
                     
-                    // Forward every event immediately (no buffering)
-                    console.log(`🚀 Immediately forwarding: ${processedEvent.appName} - ${processedEvent.eventType}`);
                     maintainCurrentState(processedEvent, currentState);
-                    forwardToWebhook(processedEvent, currentState, webhookTargetUrl);
+
+                    const mapped = mapEventToActivity(processedEvent);
+                    eventBuffer.push(mapped);
+                    console.log(`📦 Buffered activity: ${mapped.app} (${mapped.duration}s) – buffer size ${eventBuffer.length}`);
                 }
                 
                 // Update last timestamp
@@ -161,41 +161,49 @@ function receiveActivityEvent(rawEvent: any, eventBuffer: any[], currentState: a
 }
 
 function processEventWindow(eventBuffer: any[], currentState: any, webhookTargetUrl: string) {
-    console.log(`🔄 Processing ${eventBuffer.length} events...`);
-    
-    for (let event of eventBuffer) {
-        maintainCurrentState(event, currentState);
-        forwardToWebhook(event, currentState, webhookTargetUrl);
-    }
+    if (eventBuffer.length === 0) return;
+    console.log(`🔄 Sending batch of ${eventBuffer.length} activities to webhook`);
+
+    sendActivitiesToWebhook(eventBuffer, webhookTargetUrl);
+    // Clear buffer for next window
+    eventBuffer.length = 0;
 }
 
-function forwardToWebhook(event: any, currentState: any, webhookTargetUrl: string) {
-    const filteredEvent = {
-        originalEvent: event,
-        currentContext: currentState,
-        timestamp: new Date().toISOString(),
-        eventType: 'activity_change'
-    };
-    
-    // Generate signature for webhook verification
+function sendActivitiesToWebhook(activityData: any[], webhookTargetUrl: string) {
+    const payload = { activityData, agentId: process.env.AGENT_ID || undefined };
+
     const crypto = require('crypto');
+    const payloadStr = JSON.stringify(payload);
+
     const webhookSecret = process.env.WEBHOOK_SECRET || '';
     const hmac = crypto.createHmac('sha256', webhookSecret);
-    hmac.update(JSON.stringify(filteredEvent));
+    hmac.update(payloadStr);
     const signature = hmac.digest('base64');
-    
-    axios.post(webhookTargetUrl, filteredEvent, {
+
+    axios.post(webhookTargetUrl, payload, {
         headers: {
             'x-signature': signature,
             'Content-Type': 'application/json'
         }
     })
-        .then(response => {
-            console.log('✅ Event forwarded to webhook successfully');
+        .then(() => {
+            console.log('✅ Batch forwarded to webhook');
         })
-        .catch(error => {
-            console.error('❌ Failed to forward event to webhook:', error.message);
+        .catch((error: any) => {
+            console.error('❌ Failed to forward batch:', error.message);
         });
+}
+
+function mapEventToActivity(event: any) {
+    return {
+        id: String(event.id ?? Date.now()),
+        timestamp: event.timestamp ?? new Date().toISOString(),
+        app: event.appName || event.data?.app || 'Unknown',
+        title: event.windowTitle || event.data?.title || '',
+        url: event.url || event.data?.url,
+        duration: Math.round(event.duration || 0),
+        category: undefined
+    };
 }
 
 function maintainCurrentState(event: any, currentState: any) {

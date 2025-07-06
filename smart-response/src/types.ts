@@ -28,6 +28,7 @@ export interface DoodleAgent {
   id: string;
   name: string;
   avatar: string;
+  voiceId?: string;
   bio: string;
 }
 

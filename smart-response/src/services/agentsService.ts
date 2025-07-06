@@ -13,24 +13,28 @@ export class AgentsService {
         id: "af5504a3-406e-0064-8ebb-22b7c1fca166",
         name: "Deysi the Verdant Vibe",
         avatar: "https://core-storage.doodles.app/agents/deysi.png",
+        voiceId: "EXAVITQu4vr4xnSDxMaL",
         bio: "Shifts between enchantress and chaos mode depending on her mood. Can be flirtatious, radiant—or sardonic and vengeful with no warning. A fashion and energy icon in the Doodleverse, impossible to ignore."
       },
       {
         id: "b91b282c-b14a-0c3b-89da-bc535285117a",
         name: "Doug Hermlin",
         avatar: "https://core-storage.doodles.app/agents/doug.png",
+        voiceId: "ErXwobaYiN019PkySvjV",
         bio: "He has worked at Data-Bo-Data for 14 years and has never once spilled coffee. He does not drink coffee. Doug finds peace in process. Fulfillment in formatting. Quiet joy in quarterly reports that balance on the first pass."
       },
       {
         id: "c31ed031-8e65-0d9f-9c4c-fa22bf3ac89a",
         name: "Maxine Klintz",
         avatar: "https://core-storage.doodles.app/agents/maxine.png",
+        voiceId: "MF3mGyEYCl7XYWbV9V6O",
         bio: "Senior Field Compliance Officer for DreamPump. She rarely leaves the DreamPump campus—unless something potentially irregular has occurred. Her job is inspection, containment, and escalation—when necessary."
       },
       {
         id: "89b30336-e318-00ba-89d5-392b23085f7b",
         name: "Kyle the Keeper",
         avatar: "https://core-storage.doodles.app/agents/kyle.png",
+        voiceId: "TxGEqnHWrfWFTfGW9XjX",
         bio: "After a Joygu containment breach in Dullsville, Kyle followed a dripping rainbow into a swirling rift. Now fully exiled from the gray world, he wanders the Doodleverse as a mad oracle of misplaced systems."
       }
     ];
