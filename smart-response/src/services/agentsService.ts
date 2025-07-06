@@ -1,10 +1,13 @@
 import axios from 'axios';
 import { DoodleAgent, AgentResponse, ProcessedActivity } from '../types';
 import { logger } from '../utils/logger';
+import OpenAI from 'openai';
+import { config } from '../config';
 
 export class AgentsService {
   private apiUrl: string;
   private agents: DoodleAgent[];
+  private openaiClient?: OpenAI;
 
   constructor() {
     this.apiUrl = process.env.AGENTS_API_URL || 'https://agents-api.doodles.app';
@@ -38,13 +41,26 @@ export class AgentsService {
         bio: "After a Joygu containment breach in Dullsville, Kyle followed a dripping rainbow into a swirling rift. Now fully exiled from the gray world, he wanders the Doodleverse as a mad oracle of misplaced systems."
       }
     ];
+
+    // Initialise OpenAI client for dynamic agent selection (optional)
+    if (config.openai.apiKey) {
+      try {
+        this.openaiClient = new OpenAI({ apiKey: config.openai.apiKey });
+      } catch (error) {
+        logger.warn('Failed to initialise OpenAI for agent selection – falling back to heuristic logic');
+      }
+    }
   }
 
   async generateAgentResponse(processedActivity: ProcessedActivity, agentId?: string): Promise<AgentResponse> {
     try {
-      const selectedAgent = agentId
-        ? this.agents.find((a) => a.id === agentId) || this.selectAgentByActivity(processedActivity)
-        : this.selectAgentByActivity(processedActivity);
+      let selectedAgent: DoodleAgent;
+
+      if (agentId) {
+        selectedAgent = this.agents.find((a) => a.id === agentId) || (await this.selectAgentWithAI(processedActivity));
+      } else {
+        selectedAgent = await this.selectAgentWithAI(processedActivity);
+      }
 
       logger.info(`Generating response with agent: ${selectedAgent.name}`);
 
@@ -258,5 +274,61 @@ export class AgentsService {
     if (typeof response.data === 'string') return response.data;
     // Fallback: stringify entire response
     return JSON.stringify(response.data);
+  }
+
+  /**
+   * Choose the most appropriate agent for the given activity using OpenAI.
+   * Falls back to heuristic selection if OpenAI is unavailable or fails.
+   */
+  private async selectAgentWithAI(processedActivity: ProcessedActivity): Promise<DoodleAgent> {
+    // If no OpenAI client configured, use heuristic
+    if (!this.openaiClient) {
+      return this.selectAgentByActivity(processedActivity);
+    }
+
+    try {
+      const prompt = this.buildAgentSelectionPrompt(processedActivity);
+
+      const completion = await this.openaiClient.chat.completions.create({
+        model: config.openai.model,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an assistant that chooses the best Doodles agent ID for responding to a user based on their recent computer activity.'
+          },
+          {
+            role: 'user',
+            content: prompt,
+          }
+        ],
+        max_tokens: 10,
+        temperature: 0,
+      });
+
+      const reply = completion.choices?.[0]?.message?.content?.trim();
+
+      if (reply) {
+        const cleaned = reply.replace(/[\n\r\"]/g, '').trim();
+        const found = this.agents.find(a => a.id === cleaned || a.name.toLowerCase().includes(cleaned.toLowerCase()));
+        if (found) return found;
+      }
+    } catch (error) {
+      logger.warn('OpenAI agent selection failed – falling back to heuristic method', error);
+    }
+
+    // Default fallback
+    return this.selectAgentByActivity(processedActivity);
+  }
+
+  /**
+   * Build a concise prompt for OpenAI to decide which agent should respond.
+   * The model is asked to return *only* the agent ID.
+   */
+  private buildAgentSelectionPrompt(activity: ProcessedActivity): string {
+    const agentList = this.agents.map(a => `${a.name} (id: ${a.id})`).join('; ');
+
+    return `Here are four possible agents: ${agentList}.
+
+Given the following user activity summary, choose the single most suitable agent **id** (no additional text):\n\n"${activity.summary}"\n\nProductivity score: ${activity.productivity_score}. Category: ${activity.category}. Focus periods: ${activity.focus_periods.length}.`;
   }
 } 

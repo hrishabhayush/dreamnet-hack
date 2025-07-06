@@ -4,7 +4,7 @@
   "description": "Smart filtering service for ActivityWatch data",
   "main": "dist/buffer.js",
   "scripts": {
-    "start": "node dist/buffer.js",
+    "start": "npm run build && node dist/buffer.js",
     "dev": "ts-node src/buffer.ts",
     "build": "tsc",
     "test": "echo \"Error: no test specified\" && exit 1"

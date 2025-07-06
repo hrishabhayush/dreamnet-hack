@@ -1,0 +1,16 @@
+{
+  "name": "screen-overlay",
+  "version": "1.0.0",
+  "description": "Always-on-top overlay that shows Doodles agent replies and speaks them aloud",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron ."
+  },
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "electron": "^29.3.1"
+  }
+} 

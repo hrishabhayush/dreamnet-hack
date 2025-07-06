@@ -10,6 +10,8 @@ app.use(express.json());
 
 let lastEventTimestamp: string = new Date(Date.now() - 30000).toISOString(); // Start 30 seconds ago
 
+// Cache of the most recent agent reply for the overlay service
+let lastAgentReply: { text: string; avatar?: string; voiceId?: string; timestamp: string } | null = null;
 
 function startBufferService() {
     // Initialize express server on BUFFER_PORT    
@@ -122,9 +124,9 @@ async function pollActivityWatchData(activityWatchUrl: string, eventBuffer: any[
                     
                     maintainCurrentState(processedEvent, currentState);
 
-                    const mapped = mapEventToActivity(processedEvent);
-                    eventBuffer.push(mapped);
-                    console.log(`📦 Buffered activity: ${mapped.app} (${mapped.duration}s) – buffer size ${eventBuffer.length}`);
+                    // Push the unmodified event so that the exact activity log is sent to the agent
+                    eventBuffer.push(event);
+                    console.log(`📦 Buffered raw activity – buffer size ${eventBuffer.length}`);
                 }
                 
                 // Update last timestamp
@@ -162,35 +164,89 @@ function receiveActivityEvent(rawEvent: any, eventBuffer: any[], currentState: a
 
 function processEventWindow(eventBuffer: any[], currentState: any, webhookTargetUrl: string) {
     if (eventBuffer.length === 0) return;
-    console.log(`🔄 Sending batch of ${eventBuffer.length} activities to webhook`);
+    console.log(`🔄 Sending batch of ${eventBuffer.length} activities to agent API`);
 
-    sendActivitiesToWebhook(eventBuffer, webhookTargetUrl);
+    // Forward the raw buffer to the agent API instead of the local webhook
+    sendActivitiesToAgent(eventBuffer, webhookTargetUrl);
     // Clear buffer for next window
     eventBuffer.length = 0;
 }
 
-function sendActivitiesToWebhook(activityData: any[], webhookTargetUrl: string) {
-    const payload = { activityData, agentId: process.env.AGENT_ID || undefined };
+/**
+ * Send the raw activity data chunk to the Doodles Agents API and
+ * print the agent\'s reply to the console. Runs every 30 seconds.
+ */
+function sendActivitiesToAgent(activityData: any[], _webhookTargetUrl: string) {
+    const agentId = process.env.AGENT_ID;
+    const apiBase = process.env.AGENTS_API_URL || 'https://agents-api.doodles.app';
+    const miniAppId = process.env.MINI_APP_ID;
+    const miniAppSecret = process.env.MINI_APP_SECRET;
 
-    const crypto = require('crypto');
-    const payloadStr = JSON.stringify(payload);
+    if (!agentId) {
+        console.error('❌ AGENT_ID env var missing – cannot send to agent');
+        return;
+    }
+    if (!miniAppId || !miniAppSecret) {
+        console.error('❌ MINI_APP_ID or MINI_APP_SECRET env vars missing – cannot authenticate');
+        return;
+    }
 
-    const webhookSecret = process.env.WEBHOOK_SECRET || '';
-    const hmac = crypto.createHmac('sha256', webhookSecret);
-    hmac.update(payloadStr);
-    const signature = hmac.digest('base64');
+    const url = `${apiBase}/${agentId}/user/message`;
 
-    axios.post(webhookTargetUrl, payload, {
-        headers: {
-            'x-signature': signature,
-            'Content-Type': 'application/json'
+    axios.post(
+        url,
+        { text: JSON.stringify(activityData) },
+        {
+            headers: {
+                'Content-Type': 'application/json',
+                'x-mini-app-id': miniAppId,
+                'x-mini-app-secret': miniAppSecret,
+            },
+            timeout: 30000, // 30-second timeout in case of network issues
         }
-    })
-        .then(() => {
-            console.log('✅ Batch forwarded to webhook');
+    )
+        .then((response) => {
+            // Extract readable text from the agent API (sometimes returns JSON string)
+            let raw = response.data?.text ?? response.data;
+            let replyText: string;
+
+            if (typeof raw === 'string') {
+                // Try to parse JSON string e.g. "[ { text: '...', user: '...' } ]"
+                try {
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].text) {
+                        replyText = parsed[0].text as string;
+                    } else if (typeof parsed === 'string') {
+                        replyText = parsed;
+                    } else {
+                        replyText = raw;
+                    }
+                } catch {
+                    replyText = raw; // not JSON, keep as-is
+                }
+            } else if (Array.isArray(raw) && raw.length > 0 && raw[0].text) {
+                // Raw is already parsed array
+                replyText = raw[0].text as string;
+            } else {
+                replyText = JSON.stringify(raw);
+            }
+
+            console.log('🗨️  Agent response:', replyText);
+
+            // Store for overlay polling
+            lastAgentReply = {
+                text: replyText,
+                avatar: response.data?.agent?.avatar,
+                voiceId: response.data?.agent?.voiceId,
+                timestamp: new Date().toISOString(),
+            };
         })
         .catch((error: any) => {
-            console.error('❌ Failed to forward batch:', error.message);
+            if (error.response) {
+                console.error('❌ Agent API error:', error.response.status, error.response.data);
+            } else {
+                console.error('❌ Failed to contact agent API:', error.message);
+            }
         });
 }
 
@@ -212,6 +268,12 @@ function maintainCurrentState(event: any, currentState: any) {
     if (event.idleStatus !== undefined) currentState.isIdle = event.idleStatus;
     currentState.lastEventTime = new Date();
 }
+
+// Endpoint for Electron overlay to fetch the latest agent reply
+app.get('/latest', (_req: any, res: any) => {
+    if (!lastAgentReply) return res.status(204).send();
+    res.json(lastAgentReply);
+});
 
 // Start the service
 startBufferService();
