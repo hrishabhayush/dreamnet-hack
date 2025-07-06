@@ -66,5 +66,7 @@ export interface Config {
   };
   agents: {
     apiUrl: string;
+    miniAppId: string;
+    miniAppSecret: string;
   };
 } 

@@ -38,21 +38,34 @@ export class AgentsService {
 
   async generateAgentResponse(processedActivity: ProcessedActivity, agentId?: string): Promise<AgentResponse> {
     try {
-      const selectedAgent = agentId 
-        ? this.agents.find(a => a.id === agentId) || this.selectAgentByActivity(processedActivity)
+      const selectedAgent = agentId
+        ? this.agents.find((a) => a.id === agentId) || this.selectAgentByActivity(processedActivity)
         : this.selectAgentByActivity(processedActivity);
 
       logger.info(`Generating response with agent: ${selectedAgent.name}`);
 
-      const message = await this.generatePersonalizedMessage(selectedAgent, processedActivity);
+      // Build a concise message describing the user's recent activity (30-second chunk)
+      const userMessage = this.buildUserMessage(processedActivity);
+
+      // Attempt remote call to Doodles Agents API
+      let agentReply: string | undefined;
+      try {
+        agentReply = await this.sendMessageToAgent(selectedAgent.id, userMessage);
+      } catch (err) {
+        logger.warn('Remote agent API call failed, falling back to local generator');
+      }
+
+      // If remote call failed or empty, fall back to local message generation
+      const finalMessage = agentReply || (await this.generatePersonalizedMessage(selectedAgent, processedActivity));
+
       const insights = this.generatePersonalityInsights(selectedAgent, processedActivity);
       const tone = this.determineResponseTone(selectedAgent, processedActivity);
 
       return {
         agent: selectedAgent,
-        message,
+        message: finalMessage,
         personality_insights: insights,
-        tone
+        tone,
       };
     } catch (error) {
       logger.error('Error generating agent response:', error);
@@ -60,9 +73,9 @@ export class AgentsService {
       const fallbackAgent = this.agents[1]; // Doug
       return {
         agent: fallbackAgent,
-        message: "Systems operational. All metrics within acceptable parameters. Please continue with scheduled activities.",
-        personality_insights: ["Consistent workflow patterns detected", "Recommend maintaining current productivity protocols"],
-        tone: 'strict'
+        message: 'Systems operational. All metrics within acceptable parameters. Please continue with scheduled activities.',
+        personality_insights: ['Consistent workflow patterns detected', 'Recommend maintaining current productivity protocols'],
+        tone: 'strict',
       };
     }
   }
@@ -203,5 +216,43 @@ export class AgentsService {
 
   getAgentById(id: string): DoodleAgent | undefined {
     return this.agents.find(agent => agent.id === id);
+  }
+
+  /**
+   * Format the processed activity into a short text message suitable for the agent.
+   */
+  private buildUserMessage(activity: ProcessedActivity): string {
+    const hours = Math.floor(activity.time_spent / 60);
+    const minutes = activity.time_spent % 60;
+    return `Activity summary: ${activity.summary}. Productivity score ${activity.productivity_score}/100. Time spent ${hours}h ${minutes}m. Focus periods ${activity.focus_periods.length}. Recommendations so far: ${activity.recommendations.join(', ')}.`;
+  }
+
+  /**
+   * Send a message to the Doodles agent via the hackathon API and return its text response.
+   */
+  private async sendMessageToAgent(agentId: string, text: string, user: string = 'user'): Promise<string> {
+    const url = `${this.apiUrl}/${agentId}/user/message`;
+
+    const headers = {
+      'Content-Type': 'application/json',
+      'x-mini-app-id': process.env.MINI_APP_ID as string,
+      'x-mini-app-secret': process.env.MINI_APP_SECRET as string,
+    } as Record<string, string>;
+
+    if (!headers['x-mini-app-id'] || !headers['x-mini-app-secret']) {
+      throw new Error('MINI_APP_ID or MINI_APP_SECRET env vars not set');
+    }
+
+    const response = await axios.post(
+      url,
+      { text, user },
+      { headers }
+    );
+
+    // The API docs do not specify the exact shape; assume it returns { text: "..." }
+    if (response.data?.text) return response.data.text;
+    if (typeof response.data === 'string') return response.data;
+    // Fallback: stringify entire response
+    return JSON.stringify(response.data);
   }
 } 

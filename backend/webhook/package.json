@@ -1,0 +1,23 @@
+{
+  "name": "workpal-webhook",
+  "version": "1.0.0",
+  "description": "Public webhook that validates DreamNet signatures and forwards data to smart-response service.",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "ts-node src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js"
+  },
+  "author": "Hrishabh Ayush",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.2.2",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.8.0",
+    "ts-node": "^10.9.1"
+  }
+} 

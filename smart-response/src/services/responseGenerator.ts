@@ -2,14 +2,23 @@ import { ProcessedActivity, SmartResponse } from '../types';
 import { OpenAIService } from './openai';
 import { AgentsService } from './agentsService';
 import { logger } from '../utils/logger';
+import { config } from '../config';
 
 export class ResponseGenerator {
-  private openaiService: OpenAIService;
+  private openaiService?: OpenAIService;
   private agentsService: AgentsService;
 
   constructor() {
-    this.openaiService = new OpenAIService();
     this.agentsService = new AgentsService();
+
+    // Initialise OpenAI only if an API key is provided (optional)
+    if (config.openai.apiKey) {
+      try {
+        this.openaiService = new OpenAIService();
+      } catch (error) {
+        logger.warn('Failed to initialise OpenAI service – continuing without it');
+      }
+    }
   }
 
   async generateResponse(processedActivity: ProcessedActivity, agentId?: string): Promise<SmartResponse> {
@@ -19,12 +28,19 @@ export class ResponseGenerator {
       // Get agent-based response (primary)
       const agentResponse = await this.agentsService.generateAgentResponse(processedActivity, agentId);
 
-      // Get AI-generated insights (supplementary)
-      const aiInsights = await this.openaiService.generateInsights(processedActivity);
+      // Optionally get AI-generated insights (supplementary)
+      let aiInsights = '';
+      if (this.openaiService) {
+        try {
+          aiInsights = await this.openaiService.generateInsights(processedActivity);
+        } catch (err) {
+          logger.warn('OpenAI insight generation failed – skipping');
+        }
+      }
 
       // Generate structured response with agent personality
       const response: SmartResponse = {
-        insights: agentResponse.message,
+        insights: agentResponse.message || aiInsights,
         recommendations: this.enhanceRecommendationsWithPersonality(processedActivity.recommendations, agentResponse.agent.name),
         productivity_tips: this.generatePersonalityTips(processedActivity, agentResponse.agent.name),
         focus_score: this.calculateFocusScore(processedActivity),

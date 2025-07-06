@@ -15,10 +15,12 @@ export const config: Config = {
   },
   agents: {
     apiUrl: process.env.AGENTS_API_URL || 'https://agents-api.doodles.app',
+    miniAppId: process.env.MINI_APP_ID || '',
+    miniAppSecret: process.env.MINI_APP_SECRET || '',
   },
 };
 
-// Validate required environment variables
-if (!config.openai.apiKey) {
-  throw new Error('OPENAI_API_KEY environment variable is required');
+// Basic validation for agent credentials – these are required for authenticated calls
+if (!config.agents.miniAppId || !config.agents.miniAppSecret) {
+  console.warn('[WARN] MINI_APP_ID or MINI_APP_SECRET not set. Authenticated agent calls will fail.');
 } 
