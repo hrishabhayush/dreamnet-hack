@@ -37,3 +37,79 @@ Oh, looking for an internship, are we? Well, let me tell you, sweetstem, the cor
 ### Scenario 2 – Distracted Browsing
 
 [Watch the demo here.](https://screen.studio/share/8jUmV984)
+
+## 🚀 Local Setup & Running
+
+> Below is a minimal path to see the smart-response loop working on your own machine.  
+> It assumes **macOS / Linux** with Node ≥ 18 and **ActivityWatch** already installed.
+
+### 1. Clone and install deps
+
+```bash
+# clone
+git clone https://github.com/<your-username>/<repo>.git
+cd <repo>
+
+# install Node deps for each micro-service
+pnpm i -r     # if you use pnpm workspaces
+# ── or ──
+(cd activity-buffer   && npm install)
+(cd smart-response    && npm install)
+(cd screen-overlay    && npm install)
+```
+
+### 2. Configure environment variables
+
+Create `activity-buffer/.env`:
+
+```env
+# activity-buffer
+BUFFER_PORT=3000
+ACTIVITYWATCH_API_URL=http://localhost:5600/api
+
+# Doodles Agents credentials
+aGENT_ID=XXXXXXXX              # your agent id
+MINI_APP_ID=XXXXXXXX           # mini-app id
+MINI_APP_SECRET=XXXXXXXX       # mini-app secret
+AGENTS_API_URL=https://agents-api.doodles.app
+```
+
+> ⚠️  `AGENT_ID`, `MINI_APP_ID`, and `MINI_APP_SECRET` come from the Doodles console.
+
+### 3. Start ActivityWatch
+
+You should have already installed activitywatch - look at the README under activitywatch module to follow the installation and setup
+
+```bash
+aw-qt &   # starts the tray + watchers (window, web, afk …)
+```
+
+The local API is exposed at `http://localhost:5600/api` by default—exactly what the buffer expects.
+
+### 4. Run the buffer service
+
+```bash
+cd activity-buffer
+npm run dev     # uses ts-node
+# → "🚀 Buffer service started on port 3000"
+```
+
+The service now polls ActivityWatch every 2 seconds, batches events, and forwards them to the agent API.  
+A small `/latest` endpoint exposes the most recent agent reply.
+
+### 5. OPTIONAL – See live replies via the overlay
+
+```bash
+cd screen-overlay
+npm start        # launches Electron overlay
+```
+
+The overlay polls `http://localhost:3000/latest` for fresh replies and floats on top of your screen.
+
+### 6. Trigger some activity
+
+Open a few browser tabs, code editor windows, or go AFK—the buffer will send a chunk every ~45 seconds.  
+Within moments you should see the agent's contextual message appear in the overlay **and** in the buffer console (`🗨️  Agent response: …`).
+
+That's it!  Tweak watcher configs, buffer timing, or overlay styling to fit your workflow.
+
