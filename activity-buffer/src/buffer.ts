@@ -29,7 +29,7 @@ function startBufferService() {
     };
     
     let eventBuffer: any[] = [];
-    const bufferTimeWindow = 60000; // 60-second aggregation window
+    const bufferTimeWindow = 45000; // 45-second aggregation window
     const pollingInterval = 2000; // Poll every 2 seconds for immediate response
     
     // Setup ActivityWatch API connection test

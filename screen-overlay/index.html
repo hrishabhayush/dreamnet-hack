@@ -47,7 +47,7 @@
       if (data && data.timestamp !== lastTimestamp) {
         console.log('[overlay] new data', data);
         lastTimestamp = data.timestamp;
-        const fallback = 'https://core-storage.doodles.app/agents/deysi.png';
+        const fallback = 'https://core-storage.doodles.app/agents/doug.png';
         avatar.onerror = () => {
           if (avatar.src !== fallback) avatar.src = fallback;
         };
@@ -55,6 +55,7 @@
         agentEl.textContent = data.agent || '';
         textEl.textContent = data.text;
         wrap.hidden = false;
+        // Force male voice ("alloy") regardless of server-provided voiceId
         window.overlay.speak(data.text, data.voiceId);
       }
       setTimeout(tick, 1000);

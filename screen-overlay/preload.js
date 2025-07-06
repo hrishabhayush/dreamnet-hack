@@ -24,7 +24,7 @@ async function speak(text, voiceId) {
         body: JSON.stringify({
           model: 'tts-1',
           input: text,
-          voice: voiceId || 'alloy',
+          voice: 'onyx',
           format: 'mp3'
         })
       });

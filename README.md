@@ -27,3 +27,13 @@ If the user's tabs are tracked as follows within the 30-second window:
 Then the agent's response (DEYSI THE VERDANT VIBE) would something like this 
 
 Oh, looking for an internship, are we? Well, let me tell you, sweetstem, the corporate world is a lot like a garden. You've got to plant your seeds, nurture them with a little magic and moxie, and then watch them bloom into something fabulous. *She twirls her leafboard, sending a shower of glowing pollen into the air.* But be careful not to get too tangled in the weeds, or you might just lose your sparkle. So, tell me, what kind of chromatic chaos are you hoping to cultivate with this internship?
+
+## 💻 Demo Scenarios
+
+### Scenario 1 – Deep-Focus Coding
+
+[Watch the demo here.](https://screen.studio/share/kJCnwZwR)
+
+### Scenario 2 – Distracted Browsing
+
+[Watch the demo here.](https://screen.studio/share/8jUmV984)
