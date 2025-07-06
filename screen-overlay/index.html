@@ -27,12 +27,16 @@
 <body>
   <div id="wrap" hidden>
     <img id="avatar" />
-    <p id="text"></p>
+    <div>
+      <p id="agent" style="margin:0;font-weight:600;font-size:13px;opacity:0.9"></p>
+      <p id="text" style="margin-top:4px"></p>
+    </div>
   </div>
 
   <script>
     const avatar = document.getElementById('avatar');
     const textEl = document.getElementById('text');
+    const agentEl = document.getElementById('agent');
     const wrap = document.getElementById('wrap');
 
     let lastTimestamp = '';
@@ -43,10 +47,15 @@
       if (data && data.timestamp !== lastTimestamp) {
         console.log('[overlay] new data', data);
         lastTimestamp = data.timestamp;
-        avatar.src = data.avatar || '';
+        const fallback = 'https://core-storage.doodles.app/agents/deysi.png';
+        avatar.onerror = () => {
+          if (avatar.src !== fallback) avatar.src = fallback;
+        };
+        avatar.src = data.avatar || fallback;
+        agentEl.textContent = data.agent || '';
         textEl.textContent = data.text;
         wrap.hidden = false;
-        window.overlay.speak(data.text);
+        window.overlay.speak(data.text, data.voiceId);
       }
       setTimeout(tick, 1000);
     }

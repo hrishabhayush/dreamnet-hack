@@ -11,7 +11,7 @@ const ENDPOINT_CANDIDATES = [
 
 const OPENAI_KEY = process.env.OPENAI_API_KEY || process.env.openai_api_key || '';
 
-async function speak(text) {
+async function speak(text, voiceId) {
   // Prefer OpenAI TTS if key available, else fallback to browser speechSynthesis
   if (OPENAI_KEY) {
     try {
@@ -24,7 +24,7 @@ async function speak(text) {
         body: JSON.stringify({
           model: 'tts-1',
           input: text,
-          voice: 'alloy',
+          voice: voiceId || 'alloy',
           format: 'mp3'
         })
       });
